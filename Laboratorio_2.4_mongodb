@@ -1,0 +1,87 @@
+2.4 Lab: Finding Documents
+
+1.-Exercise: student_id < 65
+In the sample database, how many documents in the grades collection have a student_id less than 65?
+
+db.grades.find().pretty()
+
+Solucion:
+// just 65 docs
+db.grades.count( { student_id : { $lt : 65 } } )
+// Another way of writing the same query
+db.grades.find( { student_id : { $lt : 65 } } ).count( )
+
+Respuesta: 650 documents
+
+2.-Exercise: Inspection Result “Fail” & “Pass”
+In the sample database, how many documents in the inspections collection have result “Pass” or “Fail”?
+
+db.inspections.find().pretty()
+
+Solucion:
+Only Pass: 15688
+db.inspections.find({$or:
+[  
+	{"result" : "Pass"} 
+]
+}).count()
+
+Only Fail: 1120
+db.inspections.find({$or:
+[  
+	{"result" : "Fail"} 
+]
+}).count()
+
+Fail or Pass: 16808
+db.inspections.find({$or: [   {"result" : "Fail"} , {"result" : "Pass"}  ] }).count()
+
+3.-Exercise: View Count > 1000
+In the stories collection, write a query to find all stories where the view count is greater than 1000.
+
+Solucion:  Usamos array query operations, con elemMatch
+
+db.stories.find( { "shorturl" : { $all : [ {"view_count": {$gt : 1000}} ] } } )
+
+
+db.stories.find( {
+"shorturl" : {
+$elemMatch : {
+"view_count" : {$gt : 1000}
+} } } )
+
+
+Esta condicion la cumplen 8331 documents
+db.stories.find( {
+"shorturl" : {
+$elemMatch : {
+"view_count" : {$gt : 1000}
+} } } ).count()
+
+4.-Exercise: Most comments
+Find the video that has the most comments in the stories collection
+
+Solucion: 
+"href" : "http://digg.com/politics/Republican_Brown_wins_Massachusetts_Senate_seat",
+        "title" : "Republican Brown wins Massachusetts Senate seat!",
+        "comments" : 1864,
+
+db.stories.find().sort( { "comments" : -1 } ).limit(1).pretty()
+
+El que menos comments tiene:
+        "href" : "http://digg.com/environment/UA_Tech_Park_chosen_for_32_million_Solar_Zone_project",
+        "title" : "UA Tech Park chosen for $32 million 'Solar Zone' project",
+        "comments" : 0,
+		
+db.stories.find().sort( { "comments" : 1 } ).limit(1).pretty()
+
+
+
+
+
+5.-Exercise: Television or Videos
+Find all digg stories where the topic name is “Television” or the media type is “videos”. Skip the first 5 results and
+limit the result set to 10.
+6.-Exercise: News or Images
+Query for all digg stories whose media type is either “news” or “images” and where the topic name is “Comedy”. (For
+extra practice, construct two queries using different sets of operators to do this.)
