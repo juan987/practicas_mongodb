@@ -1,0 +1,521 @@
+//***********************
+2.4 Lab: Finding Documents
+//***********************
+
+1.-Exercise: student_id < 65
+In the sample database, how many documents in the grades collection have a student_id less than 65?
+
+db.grades.find().pretty()
+
+Solucion:
+// just 65 docs
+db.grades.count( { student_id : { $lt : 65 } } )
+// Another way of writing the same query
+db.grades.find( { student_id : { $lt : 65 } } ).count( )
+
+Respuesta: 650 documents
+
+2.-Exercise: Inspection Result “Fail” & “Pass”
+In the sample database, how many documents in the inspections collection have result “Pass” or “Fail”?
+
+db.inspections.find().pretty()
+
+Solucion:
+Only Pass: 15688
+db.inspections.find({$or:
+[  
+	{"result" : "Pass"} 
+]
+}).count()
+
+Only Fail: 1120
+db.inspections.find({$or:
+[  
+	{"result" : "Fail"} 
+]
+}).count()
+
+Fail or Pass: 16808
+db.inspections.find({$or: [   {"result" : "Fail"} , {"result" : "Pass"}  ] }).count()
+
+3.-Exercise: View Count > 1000
+In the stories collection, write a query to find all stories where the view count is greater than 1000.
+
+Solucion:  Usamos array query operations, con elemMatch
+
+db.stories.find( { "shorturl" : { $all : [ {"view_count": {$gt : 1000}} ] } } )
+
+
+db.stories.find( {
+"shorturl" : {
+$elemMatch : {
+"view_count" : {$gt : 1000}
+} } } )
+
+
+Esta condicion la cumplen 8331 documents
+db.stories.find( {
+"shorturl" : {
+$elemMatch : {
+"view_count" : {$gt : 1000}
+} } } ).count()
+
+4.-Exercise: Most comments
+Find the video that has the most comments in the stories collection
+
+Solucion: 
+"href" : "http://digg.com/politics/Republican_Brown_wins_Massachusetts_Senate_seat",
+        "title" : "Republican Brown wins Massachusetts Senate seat!",
+        "comments" : 1864,
+
+db.stories.find().sort( { "comments" : -1 } ).limit(1).pretty()
+
+El que menos comments tiene:
+        "href" : "http://digg.com/environment/UA_Tech_Park_chosen_for_32_million_Solar_Zone_project",
+        "title" : "UA Tech Park chosen for $32 million 'Solar Zone' project",
+        "comments" : 0,
+		
+db.stories.find().sort( { "comments" : 1 } ).limit(1).pretty()
+
+5.-Exercise: Television or Videos
+Find all digg stories where the topic name is “Television” or the media type is “videos”. Skip the first 5 results and
+limit the result set to 10.
+
+db.stories.find({"media" : "videos",}).limit(1).pretty()
+db.stories.find({"topic.name":"Television"}).limit(1).pretty()
+
+db.stories.find({$or:[{"topic.name":"Television"},{"media":"videos"}]}).pretty().count()
+
+RESPUESTA CORRECTA:
+db.stories.find({$or:[{"topic.name":"Television"},{"media":"videos"}]}).skip(5).limit(10)
+
+6.-Exercise: News or Images
+Query for all digg stories whose media type is either “news” or “images” and where the topic name is “Comedy”. (For
+extra practice, construct two queries using different sets of operators to do this.)
+
+Solucion 1: con $or
+db.stories.find({$or:[{"topic.name":"Comedy", "media":"news" },{"topic.name":"Comedy", "media":"images"}]})
+
+Solucion 2: con $and
+db.stories.find({$and:[{$or:[{"media":"news" },{"media":"images"}]}, {"topic.name":"Comedy"}]})
+
+//******************************************************************
+2.6 Lab: Updating Documents
+//******************************************************************
+1.-Exercise: Pass Inspections
+In the sample.inspections namespace, let’s imagine that we want to do a little data cleaning. We’ve decided to eliminate
+the “Completed” inspection result and use only “No Violation Issued” for such inspection cases. Please update all
+inspections accordingly.
+
+RESPUESTA:
+Al principio, hay 20 documentos con result : Completed. Esto se ve con este comando:
+ db.inspections.find({"result":"Completed"}).pretty().count()
+ 
+ Para cambiar Completed por No Violation Issued hacemos:
+ db.inspections.updateMany({"result" : "Completed"}, {$set:{"result":"No Violation Issued"}})
+
+ Ahora el resultado de:  
+ db.inspections.find({"result":"Completed"}).pretty().count() 
+ es 0 (CERO), 
+ ya no hay ningun doc con result Completed.
+
+2.-Exercise: Set fine value
+For all inspections that failed, set a fine value of 100.
+
+RESPUESTA:
+Hay 1120 inspecciones con result Fail:
+db.inspections.find({"result":"Fail"}).pretty().count()
+
+A todas ellas le agragamos una multa de 100.
+Usamos este comando:
+db.inspections.updateMany({"result":"Fail"}, {$set:{"fine":100}})
+
+Como el campo fine no existe, $set lo crea.
+
+Ahora hay 1120 docs con result fail y fine 100:
+db.inspections.find({"result":"Fail" , "fine":100}).count()
+
+3.-Exercise: Increase fine in ROSEDALE
+• Update all inspections done in the city of “ROSEDALE”.
+• For failed inspections, raise the “fine” value by 150.
+
+RESPUESTA:
+Hay 115 inspecciones en la ciudad de ROSEDALE:
+db.inspections.find({"address.city":"ROSEDALE"}).count()
+
+Paso 1: Actualizamos la fecha con currentDate y parametro true que pone un date, hoy 24nov2016
+db.inspections.updateMany( { "address.city":"ROSEDALE"}, { $currentDate : { "date": true} } )
+
+Paso2: For failed inspections, raise the “fine” value by 150.
+Hay 2 inspecciones Fail en ROSEDALE:
+db.inspections.find({"address.city":"ROSEDALE", "result":"Fail"}).count()
+Incrementamos la multa en 150, ahora es 100.
+El resultado final sera 250:
+db.inspections.updateMany({"address.city":"ROSEDALE", "result":"Fail"} , {$inc : {"fine":150}})
+
+
+4.-Exercise: Give a pass to “MONGODB”
+• TodayMongoDBgot a visit fromthe inspectors.
+• We passed, of course.
+• So go ahead and update “MongoDB” and set the result to “AWESOME”
+• MongoDB’s address is
+{city: 'New York', zip: 10036, street: '43', number: 229}
+
+RESPUESTA:
+La empresa MongoDB no existe:
+ db.inspections.find({"business_name":"MongoDB"}).limit(2).pretty()
+ 
+ Usamos Upsert en el update y asi se crea el nuevo documento para la empresa MongoDB:
+ 
+ db.inspections.updateMany( {"business_name":"MongoDB"},
+{ $set: { "result":"AWESOME" , "address" : {
+                "city" : "New York",
+                "zip" : 10036,
+                "street" : "43",
+                "number" : 229
+        }} },
+{ upsert: true } )
+
+5.-Exercise: Updating Array Elements
+Insert a document representing product metrics for a backpack:
+db.product_metrics.insertOne(
+{ name: "backpack",
+purchasesPast7Days: [ 0, 0, 0, 0, 0, 0, 0] })
+Each 0 within the “purchasesPast7Days” field corresponds to a day of the week. The first element is Monday, the
+second element is Tuesday, etc.).
+Write an update statement to increment the number of backpacks sold on Friday by 200.
+
+RESPUESTA:
+db.product_metrics.updateOne({"name":"backpack"} , {$inc : {"purchasesPast7Days.4":200}})
+
+Vemos el cambio:
+ db.product_metrics.find().pretty()
+{
+        "_id" : ObjectId("5837418339f045f76e9fb40a"),
+        "name" : "backpack",
+        "purchasesPast7Days" : [
+                0,
+                0,
+                0,
+                0,
+                200,
+                0,
+                0
+        ]
+}
+
+//***********************
+3.3 Lab: Optimizing an Index
+Nota: en este ejercicio, use performance
+//***********************
+1.-Exercise: What Index Do We Need?
+Run the the following Javascript file from the handouts.
+mongo --shell localhost/performance performance.js
+In the shell that launches execute the following method
+performance.init()
+The method above will build a sample data set in the “sensor_readings” collection. What index is needed for this
+query?
+db.sensor_readings.find( { tstamp: { $gte: ISODate("2012-08-01"),
+$lte: ISODate("2012-09-01") },
+active: true } ).limit(3)
+
+RESPUESTA:
+Al principio, solo existe el indice _id en orden ascendente:
+> db.sensor_readings.getIndexKeys()
+[ { "_id" : 1 } ]
+
+Al ejecutar esta query sin indices:
+db.sensor_readings.find( { tstamp: { $gte: ISODate("2012-08-01"),
+$lte: ISODate("2012-09-01") },
+active: true } ).limit(3).explain("executionStats")
+OBTENEMOS:
+"executionStats" : {
+                "executionSuccess" : true,
+                "nReturned" : 3,
+                "executionTimeMillis" : 3,
+                "totalKeysExamined" : 0,
+                "totalDocsExamined" : 2696,
+y:
+"inputStage" : {
+                                "stage" : "COLLSCAN",
+								
+				
+DEFINIMOS INDICE PARA EL CAMPO active:
+> db.sensor_readings.createIndex( { active : 1 }, { name : "myindex" } );
+{
+        "createdCollectionAutomatically" : false,
+        "numIndexesBefore" : 1,
+        "numIndexesAfter" : 2,
+        "ok" : 1
+}
+> db.sensor_readings.getIndexKeys()
+[ { "_id" : 1 }, { "active" : 1 } ]
+Repetimos la query con explain y el indice active:
+db.sensor_readings.find( { tstamp: { $gte: ISODate("2012-08-01"),
+$lte: ISODate("2012-09-01") },
+active: true } ).limit(3).explain("executionStats")
+
+OBTENEMOS:
+"inputStage" : {
+                                        "stage" : "FETCH",
+										
+        "executionStats" : {
+                "executionSuccess" : true,
+                "nReturned" : 3,
+                "executionTimeMillis" : 43,
+                "totalKeysExamined" : 36,
+                "totalDocsExamined" : 36,
+				
+LOS VALORES SE HAN REDUCIDO MUCHO.
+
+2.-Exercise: Avoiding an In-Memory Sort
+What index is needed for the following query to avoid an in-memory sort?
+db.sensor_readings.find( { active: true } ).sort( { tstamp : -1 } )
+
+RESPUESTA:
+Tenemos que volver a crear indices, incluyendo la clave tstamp:-1,
+> db.sensor_readings.dropIndex("myindex");
+{ "nIndexesWas" : 2, "ok" : 1 }
+> db.sensor_readings.getIndexKeys()
+[ { "_id" : 1 } ]
+> db.sensor_readings.createIndex( { active : 1, tstamp : -1 }, { name : "myindex" } );
+{
+        "createdCollectionAutomatically" : false,
+        "numIndexesBefore" : 1,
+        "numIndexesAfter" : 2,
+        "ok" : 1
+}
+> db.sensor_readings.getIndexKeys()
+[ { "_id" : 1 }, { "active" : 1, "tstamp" : -1 } ]
+
+Al ejecutar la query, ya no aparece In-Memory Soprt
+
+
+
+3.-Exercise: Avoiding an In-Memory Sort, 2
+What index is needed for the following query to avoid an in-memory sort?
+db.sensor_readings.find(
+{ x : { $in : [100, 200, 300, 400] } }
+).sort( { tstamp : -1 })
+
+RESPUESTA: cREAR INDICE CON EL CAMPO tstamp.
+> db.sensor_readings.createIndex( {tstamp : -1 }, { name : "myindex" } );
+{
+        "createdCollectionAutomatically" : false,
+        "numIndexesBefore" : 1,
+        "numIndexesAfter" : 2,
+        "ok" : 1
+}
+> db.sensor_readings.getIndexKeys()
+[ { "_id" : 1 }, { "tstamp" : -1 } ]
+
+
+//***************************************
+3.9 Lab: Finding and Addressing Slow Operations
+//***************************************
+1.-Exercise: Determine Indexes Needed
+• In a mongo shell run performance.b(). This will run in an infinite loop printing some output as it runs
+various statements against the server.
+• Now imaginewe have detected a performance problemand suspect there is a slow operation running.
+• Find the slowoperation and terminate it. Every slowoperation is assumed to run for 100ms or more.
+• In order to do this,open a secondwindow(or tab) and run a second instance of the mongo shell.
+• What indexes can we introduce to make the slow queries more efficient? Disregard the index created in the
+previous exercise.
+
+RESPUESTA:
+LA SLOW OPERATION ES:
+ojo: ES EL METODO PERFORMANCE.B()
+t2.find( { "str" : "this is a test" }).sort( { "x" : 1 } ).toArray();
+ t2.find( { } ).sort( { "active" : 1 } ).toArray();  "executionTimeMillis" : 753,
+ 
+ t2 es: db.sensor_readings
+
+ 
+ TENGO QUE QUITAR EL toArray por que dice que no es una funcion y no ejecuta la query.
+ db.sensor_readings.find( { "str" : "this is a test" }).sort( { "x" : 1 } ).explain("executionStats")
+{
+        "queryPlanner" : {
+                "plannerVersion" : 1,
+                "namespace" : "performance.sensor_readings",
+                "indexFilterSet" : false,
+                "parsedQuery" : {
+                        "str" : {
+                                "$eq" : "this is a test"
+                        }
+                },
+                "winningPlan" : {
+                        "stage" : "SORT",
+                        "sortPattern" : {
+                                "x" : 1
+                        },
+                        "inputStage" : {
+                                "stage" : "SORT_KEY_GENERATOR",
+                                "inputStage" : {
+                                        "stage" : "COLLSCAN",
+                                        "filter" : {
+                                                "str" : {
+                                                        "$eq" : "this is a test"
+                                                }
+                                        },
+                                        "direction" : "forward"
+                                }
+                        }
+                },
+                "rejectedPlans" : [ ]
+        },
+        "executionStats" : {
+                "executionSuccess" : true,
+                "nReturned" : 50000,
+                "executionTimeMillis" : 679,
+                "totalKeysExamined" : 0,
+                "totalDocsExamined" : 50000,
+                "executionStages" : {
+                        "stage" : "SORT",
+                        "nReturned" : 50000,
+                        "executionTimeMillisEstimate" : 630,
+                        "works" : 100004,
+                        "advanced" : 50000,
+                        "needTime" : 50003,
+                        "needYield" : 0,
+                        "saveState" : 781,
+                        "restoreState" : 781,
+                        "isEOF" : 1,
+                        "invalidates" : 0,
+                        "sortPattern" : {
+                                "x" : 1
+                        },
+                        "memUsage" : 4300000,
+                        "memLimit" : 33554432,
+                        "inputStage" : {
+                                "stage" : "SORT_KEY_GENERATOR",
+                                "nReturned" : 0,
+                                "executionTimeMillisEstimate" : 200,
+                                "works" : 50003,
+                                "advanced" : 0,
+                                "needTime" : 2,
+                                "needYield" : 0,
+                                "saveState" : 781,
+                                "restoreState" : 781,
+                                "isEOF" : 1,
+                                "invalidates" : 0,
+                                "inputStage" : {
+                                        "stage" : "COLLSCAN",
+                                        "filter" : {
+                                                "str" : {
+                                                        "$eq" : "this is a test"
+                                                }
+                                        },
+                                        "nReturned" : 50000,
+                                        "executionTimeMillisEstimate" : 50,
+                                        "works" : 50002,
+                                        "advanced" : 50000,
+                                        "needTime" : 1,
+                                        "needYield" : 0,
+                                        "saveState" : 781,
+                                        "restoreState" : 781,
+                                        "isEOF" : 1,
+                                        "invalidates" : 0,
+                                        "direction" : "forward",
+                                        "docsExamined" : 50000
+                                }
+                        }
+                }
+        },
+        "serverInfo" : {
+                "host" : "phoEnix57",
+                "port" : 27017,
+                "version" : "3.2.11",
+                "gitVersion" : "009580ad490190ba33d1c6253ebd8d91808923e4"
+        },
+        "ok" : 1
+}
+>
+
+
+//*******************
+3.10 Lab: Using explain()
+//*******************
+1.-Exercise: explain(“executionStats”)
+Drop all indexes from previous exercises:
+mongo performance
+> db.sensor_readings.dropIndexes()
+Create an index for the “active” field:
+db.sensor_readings.createIndex({ "active" : 1 } )
+How many index entries and documents are examined for the following query? How many results are returned?
+db.sensor_readings.find(
+{ "active": false, "_id": { $gte: 99, $lte: 1000 } }
+).explain("executionStats")
+
+RESPUESTA:
+        "executionStats" : {
+                "executionSuccess" : true,
+                "nReturned" : 891,
+                "executionTimeMillis" : 2,
+                "totalKeysExamined" : 902,
+                "totalDocsExamined" : 902,
+                "executionStages" : {
+                        "stage" : "KEEP_MUTATIONS",
+                        "nReturned" : 891,
+                        "executionTimeMillisEstimate" : 0,
+                        "works" : 903,
+                        "advanced" : 891,
+                        "needTime" : 11,
+                        "needYield" : 0,
+                        "saveState" : 8,
+                        "restoreState" : 8,
+                        "isEOF" : 1,
+                        "invalidates" : 0,
+                        "inputStage" : {
+                                "stage" : "FETCH",
+                                "filter" : {
+                                        "active" : {
+                                                "$eq" : false
+                                        }
+                                },
+                                "nReturned" : 891,
+                                "executionTimeMillisEstimate" : 0,
+                                "works" : 903,
+                                "advanced" : 891,
+                                "needTime" : 11,
+                                "needYield" : 0,
+                                "saveState" : 8,
+                                "restoreState" : 8,
+                                "isEOF" : 1,
+                                "invalidates" : 0,
+                                "docsExamined" : 902,
+                                "alreadyHasObj" : 0,
+                                "inputStage" : {
+                                        "stage" : "IXSCAN",
+                                        "nReturned" : 902,
+                                        "executionTimeMillisEstimate" : 0,
+                                        "works" : 903,
+                                        "advanced" : 902,
+                                        "needTime" : 0,
+                                        "needYield" : 0,
+                                        "saveState" : 8,
+                                        "restoreState" : 8,
+                                        "isEOF" : 1,
+                                        "invalidates" : 0,
+                                        "keyPattern" : {
+                                                "_id" : 1
+                                        },
+                                        "indexName" : "_id_",
+                                        "isMultiKey" : false,
+                                        "isUnique" : true,
+                                        "isSparse" : false,
+                                        "isPartial" : false,
+                                        "indexVersion" : 1,
+                                        "direction" : "forward",
+                                        "indexBounds" : {
+                                                "_id" : [
+                                                        "[99.0, 1000.0]"
+                                                ]
+                                        },
+                                        "keysExamined" : 902,
+                                        "dupsTested" : 0,
+                                        "dupsDropped" : 0,
+                                        "seenInvalidated" : 0
+                                }
+                        }
+                }
+        },
